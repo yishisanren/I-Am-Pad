@@ -1,7 +1,6 @@
 package com.houvven.impad
 
 import android.app.Activity
-import android.app.Application
 import android.content.Context
 import android.os.Process
 import android.util.Log
@@ -12,8 +11,8 @@ import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
 import org.luckypray.dexkit.DexKitBridge
 import org.luckypray.dexkit.wrap.DexMethod
-import java.io.File
 import java.lang.reflect.Modifier
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.Continuation
 
 class HookEntrance : XposedModule() {
@@ -23,13 +22,9 @@ class HookEntrance : XposedModule() {
         private const val DEXKIT_PREFS_NAME = "IAMPAD_dexkit"
         private const val QQ_TARGET_MODEL = "23046RP50C"
         private const val XHS_TARGET_MODEL = "23046RP50C"
-        private const val QQ_BUGLY_PREFS_NAME = "BUGLY_COMMON_VALUES"
-        private const val QQ_PANDORA_CACHE_PATH = "files/mmkv/Pandora"
-        private const val QQ_PANDORA_CRC_PATH = "files/mmkv/Pandora.crc"
     }
 
     private var methodCache: DexMethodCache? = null
-
     @Suppress("SpellCheckingInspection")
     private val customWeWorkPackages = setOf(
         "com.airchina.wecompro",
@@ -44,6 +39,10 @@ class HookEntrance : XposedModule() {
     )
 
     private val packageRoutes = listOf(
+        PackageRoute(
+            match = { PackageTargetResolver.resolve(it.packageName) == PackageTarget.FEISHU },
+            handle = { processFeishu(it.classLoader) }
+        ),
         PackageRoute(
             match = { it.packageName.contains("com.tencent.mobileqq") },
             handle = { processQQ() }
@@ -71,22 +70,19 @@ class HookEntrance : XposedModule() {
     )
 
     override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
-        packageRoutes.firstOrNull { it.match(param) }?.handle?.invoke(param)
+        val route = packageRoutes.firstOrNull { it.match(param) } ?: return
+        log(Log.INFO, TAG, "[IAmPad-startup] package=${param.packageName} pid=${Process.myPid()} version=${BuildConfig.VERSION_NAME}")
+        runCatching { route.handle(param) }.onFailure {
+            log(Log.ERROR, TAG, "[IAmPad-startup] installation-failed package=${param.packageName} type=${it.javaClass.simpleName}")
+        }
     }
 
     private fun processQQ() {
         simulateTabletModel("Xiaomi", QQ_TARGET_MODEL)
         simulateTabletProperties()
-        Application::class.java.resolve().firstMethod {
-            name("onCreate")
-        }.self.let { method ->
-            hook(method).intercept { chain ->
-                val context =
-                    (chain.args.firstOrNull() as? Context) ?: (chain.thisObject as? Context)
-                context?.let(::resetQQModelCacheIfNeeded)
-                chain.proceed()
-            }
-        }
+        // Preserve QQ's persisted account/device state. A telemetry cache mismatch
+        // must never trigger automatic MMKV deletion or a process-kill loop.
+        log(Log.INFO, TAG, "Installed QQ tablet identity: model=${android.os.Build.MODEL}")
     }
 
     private fun processWeChat() = afterApplicationAttach { context ->
@@ -197,6 +193,73 @@ class HookEntrance : XposedModule() {
         }
     }
 
+    private fun processFeishu(classLoader: ClassLoader) {
+        runCatching {
+            // Feishu 7.76.14 derives both passport DeviceInfo.deviceModel and the
+            // X-Device-Info login header from Build.MODEL. Its local tablet check
+            // reads ro.build.characteristics and looks for "tablet".
+            simulateTabletModel(FeishuTabletProfile.brand, FeishuTabletProfile.model)
+            simulateTabletProperties(FeishuTabletProfile.buildCharacteristics)
+            val reportedCharacteristics = Class.forName("android.os.SystemProperties")
+                .getMethod("get", String::class.java)
+                .invoke(null, "ro.build.characteristics")
+            log(
+                Log.INFO,
+                TAG,
+                "Feishu tablet identity active: " +
+                    "brand=${android.os.Build.BRAND}, " +
+                    "manufacturer=${android.os.Build.MANUFACTURER}, " +
+                    "model=${android.os.Build.MODEL}, " +
+                    "characteristics=$reportedCharacteristics"
+            )
+
+            afterApplicationAttach(tag = TAG) { context ->
+                val appClassLoader = context.classLoader
+                val deviceModelMethods =
+                    "com.ss.android.lark.passport.signinsdk_api.entity.DeviceInfo"
+                        .toClass(appClassLoader)
+                        .resolve()
+                        .method {
+                            name("getDeviceModel")
+                            returnType(String::class)
+                        }.map { it.self }
+
+                check(deviceModelMethods.size == 1) {
+                    "Expected exactly one Feishu DeviceInfo.getDeviceModel, " +
+                        "found ${deviceModelMethods.size}"
+                }
+                val loggedFirstDeviceModelRead = AtomicBoolean(false)
+                deviceModelMethods.forEach { method ->
+                    hook(method).intercept {
+                        if (loggedFirstDeviceModelRead.compareAndSet(false, true)) {
+                            log(
+                                Log.INFO,
+                                TAG,
+                                "Feishu read hooked DeviceInfo model: ${FeishuTabletProfile.model}"
+                            )
+                        }
+                        FeishuTabletProfile.model
+                    }
+                }
+                val romModel = "com.larksuite.framework.utils.RomUtils"
+                    .toClass(appClassLoader)
+                    .getDeclaredMethod("d")
+                    .invoke(null)
+                log(
+                    Log.INFO,
+                    TAG,
+                    "Installed Feishu tablet hooks: " +
+                        "deviceModel=${deviceModelMethods.size}, " +
+                        "brand=${FeishuTabletProfile.brand}, " +
+                        "model=${FeishuTabletProfile.model}, " +
+                        "romModel=$romModel"
+                )
+            }
+        }.onFailure {
+            log(Log.ERROR, TAG, "Failed to install Feishu hooks: ${it.stackTraceToString()}")
+        }
+    }
+
     private fun hookDexMethodToReturn(
         cacheKey: String,
         context: Context,
@@ -204,7 +267,15 @@ class HookEntrance : XposedModule() {
         finder: DexKitBridge.() -> DexMethod
     ) {
         val classLoader = context.classLoader
-        hookToReturn(requireMethodCache(context).findOrLoad(cacheKey, classLoader, finder), value)
+        val method = requireMethodCache(context).findOrLoad(cacheKey, classLoader, finder)
+        val hit = AtomicBoolean(false)
+        hook(method).intercept {
+            if (hit.compareAndSet(false, true)) {
+                log(Log.INFO, TAG, "[IAmPad-startup] hook-hit=$cacheKey")
+            }
+            value
+        }
+        log(Log.INFO, TAG, "[IAmPad-startup] hook-installed=$cacheKey")
     }
 
     private fun requireMethodCache(context: Context): DexMethodCache {
@@ -213,18 +284,6 @@ class HookEntrance : XposedModule() {
             module = this,
             prefs = context.getSharedPreferences(DEXKIT_PREFS_NAME, Context.MODE_PRIVATE)
         ).also { methodCache = it }
-    }
-
-    private fun resetQQModelCacheIfNeeded(context: Context) {
-        val prefs = context.getSharedPreferences(QQ_BUGLY_PREFS_NAME, Context.MODE_PRIVATE)
-        val storedMode = prefs.getString("model", QQ_TARGET_MODEL)
-        if (storedMode == QQ_TARGET_MODEL) return
-
-        log(Log.INFO, TAG, "QQ stored model not match, clear cache")
-        val appDataDir = context.applicationInfo.dataDir
-        File(appDataDir, QQ_PANDORA_CACHE_PATH).deleteRecursively()
-        File(appDataDir, QQ_PANDORA_CRC_PATH).deleteRecursively()
-        Process.killProcess(Process.myPid())
     }
 
     private fun isCustomWeWork(prp: XposedModuleInterface.PackageReadyParam): Boolean = prp.run {

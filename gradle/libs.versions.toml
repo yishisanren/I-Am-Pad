@@ -4,13 +4,14 @@ libxposedApi = "101.0.1"
 dexkit = "2.1.0"
 kavaref-core = "1.0.2"
 kavaref-extension = "1.0.2"
+junit = "4.13.2"
 
 [libraries]
 libxposed-api = { module = "io.github.libxposed:api", version.ref = "libxposedApi" }
 dexkit = { module = "org.luckypray:dexkit", version.ref = "dexkit" }
 kavaref-core = { module = "com.highcapable.kavaref:kavaref-core", version.ref = "kavaref-core" }
 kavaref-extension = { module = "com.highcapable.kavaref:kavaref-extension", version.ref = "kavaref-extension" }
+junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-

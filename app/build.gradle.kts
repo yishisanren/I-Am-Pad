@@ -10,8 +10,8 @@ android {
         applicationId = namespace
         minSdk = 27
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.1.0"
+        versionCode = 13
+        versionName = "1.2.1"
     }
     buildTypes {
         release {
@@ -38,4 +38,6 @@ dependencies {
     implementation(libs.kavaref.core)
     implementation(libs.kavaref.extension)
     compileOnly(libs.libxposed.api)
+    testImplementation(libs.junit)
+    testImplementation(libs.libxposed.api)
 }

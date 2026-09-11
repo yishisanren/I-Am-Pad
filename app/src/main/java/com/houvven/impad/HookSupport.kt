@@ -6,11 +6,11 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.highcapable.kavaref.KavaRef.Companion.resolve
 import com.highcapable.kavaref.extension.toClass
-import com.highcapable.kavaref.extension.toClassOrNull
 import io.github.libxposed.api.XposedModule
 import org.luckypray.dexkit.DexKitBridge
 import org.luckypray.dexkit.wrap.DexMethod
 import java.lang.reflect.Method
+import java.util.concurrent.atomic.AtomicBoolean
 
 internal class DexMethodCache(
     private val module: XposedModule,
@@ -63,26 +63,23 @@ internal class DexMethodCache(
 
 internal fun XposedModule.afterApplicationAttach(
     tag: String = BuildConfig.APPLICATION_ID,
+    applicationClass: Class<*> = Application::class.java,
     action: (Context) -> Unit
 ) {
-    val tinkerApplicationClass = "com.tencent.tinker.loader.app.TinkerApplication".toClassOrNull()
-    val actionWrapper: (Context) -> Unit = { context ->
-        runCatching { action(context) }.onFailure {
-            log(Log.ERROR, tag, "Failed to execute afterApplicationAttach hook: ${it.message}")
-        }
-    }
-    val useBaseContextAttached = tinkerApplicationClass != null
-    val method = tinkerApplicationClass?.resolve()
-        ?.firstMethod { name("onBaseContextAttached") }?.self
-        ?: Application::class.resolve().firstMethod { name("onCreate") }.self
-
+    // Framework attach calls the application's attachBaseContext (including Tinker).
+    // Run it unchanged first, then install against the final app context/classloader
+    // before providers and onCreate. Never replace an application lifecycle method.
+    val installed = AtomicBoolean(false)
+    val method = applicationClass.getDeclaredMethod("attach", Context::class.java)
     hook(method).intercept { chain ->
-        val context = if (useBaseContextAttached) {
-            chain.args.firstOrNull() as? Context
-        } else {
-            chain.thisObject as? Context
+        val result = chain.proceed()
+        val context = (chain.thisObject as? Context) ?: (chain.args.firstOrNull() as? Context)
+        if (context != null && installed.compareAndSet(false, true)) {
+            runCatching { action(context) }.onFailure {
+                log(Log.ERROR, tag, "Application attach hook failed: ${it.javaClass.simpleName}")
+            }
         }
-        context?.let(actionWrapper)
+        result
     }
 }
 
@@ -94,14 +91,14 @@ internal fun XposedModule.hookAllToReturn(methods: Iterable<Method>, value: Any?
     methods.forEach { hookToReturn(it, value) }
 }
 
-internal fun XposedModule.simulateTabletProperties() {
+internal fun XposedModule.simulateTabletProperties(characteristics: String = "tablet") {
     "android.os.SystemProperties".toClass().resolve().method {
         name("get")
         returnType(String::class)
     }.forEach { method ->
         hook(method.self).intercept { chain ->
             if (chain.args.firstOrNull() == "ro.build.characteristics") {
-                return@intercept "tablet"
+                return@intercept characteristics
             }
             return@intercept chain.proceed()
         }
