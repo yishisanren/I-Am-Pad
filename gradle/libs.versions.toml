@@ -1,6 +1,6 @@
 [versions]
 agp = "9.1.0"
-libxposedApi = "101.0.1"
+libxposedApi = "102.0.0"
 dexkit = "2.1.0"
 kavaref-core = "1.0.2"
 kavaref-extension = "1.0.2"

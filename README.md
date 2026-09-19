@@ -16,9 +16,13 @@
   - 国航之翼
   - 粤政易
 
-## 1.2.2 状态
+## 1.2.3 状态：API 102，真机待验证
 
-适配微信 8.0.78（3180）拆分后的折叠屏判断。适配代码已在 Android 16 真机验证扫码登录、应用冷启动、整机重启；用户确认重启后安卓与 iPhone 同时在线、消息正常。详见 [微信 8.0.78 实测记录](docs/wechat-8.0.78.md) 与 [更新日志](CHANGELOG.md)。
+升级到正式依赖 `io.github.libxposed:api:102.0.0`，模块最低与目标 API 均为 102。运行环境必须支持 libxposed API 102 或更高版本；仍使用 API 101 框架的设备请继续使用 [v1.2.2](https://github.com/yishisanren/I-Am-Pad/releases/tag/v1.2.2)。这里的 API 102 是 Xposed 框架接口版本，不是 Android SDK 版本。
+
+本版保留微信 8.0.78（3180）的适配及现有生命周期修复，关闭自动热重载，覆盖安装后需重新启动作用域中的应用。**1.2.3 尚未进行真机安装、登录、双端消息和系统重启验收**，按计划先完成离线检查与 Release 发布，再接入真机验证。详见 [API 102 迁移说明](docs/api-102-migration.md) 与 [更新日志](CHANGELOG.md)。
+
+历史结果：1.2.2 的微信适配代码已在 Android 16 真机验证扫码登录、应用冷启动、整机重启，用户确认重启后安卓与 iPhone 同时在线、消息正常；该结果不等同于 1.2.3 已通过真机验收。见 [微信 8.0.78 实测记录](docs/wechat-8.0.78.md)。
 
 安装包从 [本分支 GitHub Releases](https://github.com/yishisanren/I-Am-Pad/releases/latest) 下载，为已签名、不可调试的 Release 构建。为保持覆盖安装兼容性，沿用 1.2.1 的签名证书；证书名称为 Android Debug，不代表构建类型为 Debug。GitHub Actions 产物仅用于构建检查，未签名，不能直接安装。
 

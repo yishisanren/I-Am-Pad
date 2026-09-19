@@ -72,9 +72,13 @@ class ApplicationLifecycleTest {
             }
         }
         val module = object : XposedModule() {}
+        // Only the test stands in for the framework. Production never calls this
+        // internal API; API 102 requires the framework's detach callback as well.
         XposedInterfaceWrapper::class.java.getDeclaredMethod(
-            "attachFramework", XposedInterface::class.java
-        ).apply { isAccessible = true }.invoke(module, framework)
+            "attachFramework", XposedInterface::class.java, Runnable::class.java
+        ).apply { isAccessible = true }.invoke(module, framework, Runnable {
+            error("Installing a lifecycle hook must not detach the module")
+        })
         module.afterApplicationAttach(applicationClass = FrameworkApplication::class.java, action = action)
         return installedHook
     }
