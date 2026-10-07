@@ -20,7 +20,6 @@ class HookEntrance : XposedModule() {
     companion object {
         private const val TAG = BuildConfig.APPLICATION_ID
         private const val DEXKIT_PREFS_NAME = "IAMPAD_dexkit"
-        private const val QQ_TARGET_MODEL = "23046RP50C"
         private const val XHS_TARGET_MODEL = "23046RP50C"
     }
 
@@ -44,8 +43,8 @@ class HookEntrance : XposedModule() {
             handle = { processFeishu(it.classLoader) }
         ),
         PackageRoute(
-            match = { it.packageName.contains("com.tencent.mobileqq") },
-            handle = { processQQ() }
+            match = { it.packageName == "com.tencent.mobileqq" },
+            handle = { processQQ(it.classLoader) }
         ),
         PackageRoute(
             match = { it.packageName.contains("com.tencent.mm") },
@@ -77,12 +76,23 @@ class HookEntrance : XposedModule() {
         }
     }
 
-    private fun processQQ() {
-        simulateTabletModel("Xiaomi", QQ_TARGET_MODEL)
-        simulateTabletProperties()
-        // Preserve QQ's persisted account/device state. A telemetry cache mismatch
-        // must never trigger automatic MMKV deletion or a process-kill loop.
-        log(Log.INFO, TAG, "Installed QQ tablet identity: model=${android.os.Build.MODEL}")
+    private fun processQQ(classLoader: ClassLoader) {
+        // QQ 9.3.70 AppSetting.o(Context) derives the multi-device login type
+        // from PadUtil's enum classifier. Keep the real hardware identity intact.
+        // Unknown classifier layouts fail without restoring broad Build/property hooks.
+        val padUtil = Class.forName("com.tencent.common.config.pad.PadUtil", false, classLoader)
+        val deviceType = Class.forName("com.tencent.common.config.pad.DeviceType", false, classLoader)
+        installQQTabletClassifier(padUtil, deviceType)
+        log(Log.INFO, TAG, "[IAmPad-QQ] classifier installed; hardware identity preserved")
+        afterApplicationAttach { context ->
+            val finalPadUtil = Class.forName("com.tencent.common.config.pad.PadUtil", false, context.classLoader)
+            if (finalPadUtil != padUtil) {
+                val finalDeviceType = Class.forName("com.tencent.common.config.pad.DeviceType", false, context.classLoader)
+                installQQTabletClassifier(finalPadUtil, finalDeviceType)
+            }
+            log(Log.INFO, TAG, "[IAmPad-QQ] final classifier class matches early=${finalPadUtil == padUtil}")
+            installQQLoginObserver(context)
+        }
     }
 
     private fun processWeChat() = afterApplicationAttach { context ->

@@ -1,5 +1,16 @@
 # 更新日志
 
+## 1.2.4-qq.3（2026-10-07，预发布）
+
+- QQ 9.3.70 改为定位 `PadUtil` 唯一的 `Context -> DeviceType` 分类方法，保留原方法初始化与异常，返回其原生 TABLET 枚举；移除 QQ 的全局品牌、型号与系统属性伪装。
+- 在原始 Application.attach 完成后对 QQ 实际 ClassLoader 安装适配，覆盖主进程和 MSF 进程；包名匹配改为准确匹配 QQ。
+- 登录参数诊断只观察 QQ 自己调用 `AppSetting.e()` 的结果，不提前调用初始化，不覆盖 App ID 或签名参数。
+- 11 项单元测试通过，Release Lint 无错误、8 项警告，签名与已安装版本一致，装机 APK 字节核验一致。
+- 真机确认 TABLET 分类和内置平板 App ID 选择；用户确认 Android 与 iPhone Air 同时在线、消息正常，工具实测 QQ 冷启动保持登录。跨天验证仍未完成，短信或人脸验证是否由 Hook 检测触发，没有证据确认。
+- 提供与候选相同 versionCode、同签名的旧逻辑回退包，可覆盖安装保留模块数据。回退会恢复旧 QQ 适配，不能解决已知双端互踢问题。
+
+代码与已装机验证的原包同步至 [GitHub 预发布版本](https://github.com/yishisanren/I-Am-Pad/releases/tag/v1.2.4-qq.3)，稳定版仍为 1.2.3。其他应用适配代码未变更。详见 [QQ 诊断与验证记录](docs/qq-9.3.70.md)。
+
 ## 1.2.3（2026-09-19）
 
 ### API 102 迁移

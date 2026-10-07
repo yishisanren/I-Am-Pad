@@ -10,8 +10,8 @@ android {
         applicationId = namespace
         minSdk = 27
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.2.3"
+        versionCode = 18
+        versionName = "1.2.4-qq.3"
     }
     buildTypes {
         release {

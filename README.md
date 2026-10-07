@@ -16,6 +16,12 @@
   - 国航之翼
   - 粤政易
 
+## QQ 9.3.70 本地修复候选
+
+`1.2.4-qq.3 / 18` 针对 QQ 9.3.70 改用 QQ 自身的设备分类方法，并在 Application.attach 执行完成后适配其实际 ClassLoader；QQ 不再修改系统品牌、型号或 `ro.build.characteristics`。2026-10-07 已在 OPPO PME110 / Android 17 / LSPosed 2.2.1（7912）实测主进程与 MSF 通信进程的自然登录调用均选择 QQ 内置平板 App ID。用户确认 Android 与 iPhone Air 同时在线、消息正常，工具实测 Android QQ 冷启动后保持登录。跨天安全验证仍未验收，不能据此认定 QQ 风控已解决。
+
+已装机验证的原包与回退包在 [v1.2.4-qq.3 预发布版本](https://github.com/yishisanren/I-Am-Pad/releases/tag/v1.2.4-qq.3) 下载，稳定版仍为 1.2.3。此次发布沿用已验收 APK，不重新打包。详见 [QQ 诊断与验证记录](docs/qq-9.3.70.md)。
+
 ## 1.2.3 状态：API 102，微信真机验收通过
 
 升级到正式依赖 `io.github.libxposed:api:102.0.0`，模块最低与目标 API 均为 102。运行环境必须支持 libxposed API 102 或更高版本；仍使用 API 101 框架的设备请继续使用 [v1.2.2](https://github.com/yishisanren/I-Am-Pad/releases/tag/v1.2.2)。这里的 API 102 是 Xposed 框架接口版本，不是 Android SDK 版本。
