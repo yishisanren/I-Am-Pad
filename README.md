@@ -20,7 +20,7 @@
 
 **2026-10-08 回填：1.2.4-qq.3 跨天验收失败，暂不建议安装。** 次日首次打开 QQ 出现“身份验证失败，请你重新登录。(w21)”。现场主进程与 MSF 的 TABLET 分类、平板 App ID 仍正确，因此昨天的短时双端在线与冷启动通过不能视为会话稳定性修复。W21 的具体根因仍在排查，不能认定为 Hook 检测。
 
-`1.2.4-qq.3 / 18` 针对 QQ 9.3.70 改用 QQ 自身的设备分类方法，并在 Application.attach 执行完成后适配其实际 ClassLoader；QQ 不再修改系统品牌、型号或 `ro.build.characteristics`。2026-10-07 已在 OPPO PME110 / Android 17 / LSPosed 2.2.1（7912）实测主进程与 MSF 通信进程的自然登录调用均选择 QQ 内置平板 App ID。用户确认 Android 与 iPhone Air 同时在线、消息正常，工具实测 Android QQ 冷启动后保持登录。跨天安全验证仍未验收，不能据此认定 QQ 风控已解决。
+`1.2.4-qq.3 / 18` 针对 QQ 9.3.70 改用 QQ 自身的设备分类方法，并在 Application.attach 执行完成后适配其实际 ClassLoader；QQ 不再修改系统品牌、型号或 `ro.build.characteristics`。2026-10-07 曾在 OPPO PME110 / Android 17 / LSPosed 2.2.1（7912）实测主进程与 MSF 通信进程的自然登录调用均选择 QQ 内置平板 App ID，用户确认 Android 与 iPhone Air 同时在线、消息正常，工具实测 Android QQ 冷启动后保持登录。以上为当天的短时结果；次日跨天验收已失败。
 
 已装机验证的原包与回退包在 [v1.2.4-qq.3 预发布版本](https://github.com/yishisanren/I-Am-Pad/releases/tag/v1.2.4-qq.3) 下载，稳定版仍为 1.2.3。此次发布沿用已验收 APK，不重新打包。详见 [QQ 诊断与验证记录](docs/qq-9.3.70.md)。
 
